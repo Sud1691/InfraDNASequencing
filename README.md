@@ -47,7 +47,8 @@ pip install -r requirements.txt
 
 # Configure
 cp .env.example .env
-# Edit .env with your ANTHROPIC_API_KEY
+# Edit .env with your ANTHROPIC_API_KEY, then export the variables
+export $(grep -v '^#' .env | xargs)
 
 # Snapshot before change
 python infra_dna_sequencer.py --mode snapshot --label before_change
@@ -154,13 +155,13 @@ Each snapshot collects:
 
 ## CI/CD Integration
 
-Pre-built integrations are included for:
+A pre-built Jenkins pipeline is included:
 
-- **GitHub Actions** - `.github/workflows/terraform-deploy.yml`
-- **GitLab CI** - `.gitlab-ci.yml`
 - **Jenkins** - `Jenkinsfile`
 
-Each pipeline captures a snapshot before deployment, runs the deployment, captures a snapshot after, and produces a mutation analysis report. See [SETUP.md](SETUP.md) for configuration details.
+The pipeline captures a snapshot before deployment, runs the deployment, captures a snapshot after, and produces a mutation analysis report. See [SETUP.md](SETUP.md) for configuration details.
+
+The wrapper scripts (`terraform-with-dna.sh`, `deploy-with-dna.sh`) can be integrated into any CI/CD system by calling them in place of bare `terraform` or `kubectl` commands.
 
 ## Project Structure
 
@@ -171,11 +172,10 @@ infra-dna-sequencer/
   terraform-with-dna.sh        # Terraform wrapper script
   deploy-with-dna.sh           # Kubernetes deployment wrapper
   k8s-monitoring-cronjob.yaml  # K8s CronJob for continuous monitoring
+  Jenkinsfile                  # Jenkins pipeline
   requirements.txt             # Python dependencies
   .env.example                 # Environment variable template
-  .github/workflows/           # GitHub Actions workflow
-  .gitlab-ci.yml               # GitLab CI pipeline
-  Jenkinsfile                  # Jenkins pipeline
+  .gitignore                   # Git ignore rules
   snapshots/                   # Snapshot storage (gitignored)
   incidents/                   # Incident analysis reports (gitignored)
   deployments/                 # Deployment analysis reports (gitignored)

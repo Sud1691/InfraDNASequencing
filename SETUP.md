@@ -35,14 +35,25 @@ pip install -r requirements.txt
 | `boto3` | AWS resource discovery |
 | `kubernetes` | Kubernetes API client for service dependency discovery |
 | `python-dotenv` | Environment variable loading from `.env` |
+| `requests` | Optional -- needed for Prometheus incident detection and Slack notifications |
+
+Install `requests` separately if you plan to use continuous monitoring with Prometheus or Slack alerts:
+
+```bash
+pip install requests
+```
 
 ## 2. Configuration
 
-Copy the example environment file and fill in your values:
+Copy the example environment file, fill in your values, and export them into your shell:
 
 ```bash
 cp .env.example .env
+# Edit .env with your values, then:
+export $(grep -v '^#' .env | xargs)
 ```
+
+**Note:** The code reads environment variables via `os.getenv()`. The `.env` file is not auto-loaded at runtime, so variables must be exported in your shell (or loaded via your CI/CD system, systemd `EnvironmentFile`, etc.).
 
 ### Environment Variables
 
@@ -226,27 +237,31 @@ This creates:
 
 ## 8. CI/CD Integration
 
-### GitHub Actions
-
-The workflow at `.github/workflows/terraform-deploy.yml` is ready to use. Add the following secrets to your repository:
-
-- `ANTHROPIC_API_KEY`
-- AWS credentials (via OIDC or `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY`)
-
-The workflow runs on pushes to `main` and:
-1. Takes a pre-deployment snapshot
-2. Runs `terraform plan` and `terraform apply`
-3. Takes a post-deployment snapshot and runs analysis
-4. Uploads the analysis as a build artifact
-5. Comments analysis on PRs (when triggered by a pull request)
-
-### GitLab CI
-
-The `.gitlab-ci.yml` pipeline works similarly. Add `ANTHROPIC_API_KEY` as a CI/CD variable in your project settings.
-
 ### Jenkins
 
-The `Jenkinsfile` expects an `anthropic-api-key` credential in Jenkins. The analysis is archived as a build artifact.
+The included `Jenkinsfile` provides a full pipeline with DNA sequencing. It expects an `anthropic-api-key` credential in Jenkins. The analysis is archived as a build artifact.
+
+Pipeline stages:
+1. Install Python dependencies
+2. Pre-deployment snapshot
+3. Terraform plan
+4. Manual approval gate
+5. Terraform apply
+6. Post-deployment analysis (archived as artifact)
+
+### Other CI/CD Systems
+
+For GitHub Actions, GitLab CI, or other systems, use the wrapper scripts in your pipeline steps:
+
+```yaml
+# Example: generic CI steps
+- run: pip install -r requirements.txt
+- run: python automated_sequencer.py pre-deploy
+- run: terraform apply -auto-approve
+- run: python automated_sequencer.py post-deploy success
+```
+
+Or use `./terraform-with-dna.sh apply -auto-approve` which handles the full before/after cycle automatically.
 
 ## 9. Snapshot Retention
 
