@@ -1,0 +1,70 @@
+stages:
+  - snapshot-pre
+  - plan
+  - deploy
+  - snapshot-post
+  - analyze
+
+variables:
+  ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
+  TERRAFORM_DIR: ./terraform
+
+snapshot-before:
+  stage: snapshot-pre
+  image: python:3.11
+  before_script:
+    - pip install -r requirements.txt
+  script:
+    - python automated_sequencer.py pre-deploy
+  artifacts:
+    paths:
+      - /tmp/pre_deploy_snapshot.txt
+    expire_in: 1 hour
+
+terraform-plan:
+  stage: plan
+  image: hashicorp/terraform:latest
+  script:
+    - cd terraform
+    - terraform init
+    - terraform plan -out=plan.tfplan
+  artifacts:
+    paths:
+      - terraform/plan.tfplan
+
+terraform-apply:
+  stage: deploy
+  image: hashicorp/terraform:latest
+  script:
+    - cd terraform
+    - terraform apply -auto-approve plan.tfplan
+  when: manual
+  only:
+    - main
+
+snapshot-after:
+  stage: snapshot-post
+  image: python:3.11
+  before_script:
+    - pip install -r requirements.txt
+  script:
+    - python automated_sequencer.py post-deploy ${CI_JOB_STATUS}
+  when: always
+  dependencies:
+    - snapshot-before
+    - terraform-apply
+
+analyze:
+  stage: analyze
+  image: python:3.11
+  before_script:
+    - pip install -r requirements.txt
+  script:
+    - |
+      if [ -d "deployments" ]; then
+        echo "Deployment analysis completed"
+        cat deployments/*/analysis.txt
+      fi
+  when: always
+  dependencies:
+    - snapshot-after
